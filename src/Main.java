@@ -15,8 +15,9 @@ public class Main {
 			Integer train1_speed = Integer.parseInt(args[1]);
 			Integer train2_speed = Integer.parseInt(args[2]);
 			Integer tsim_speed = (args.length >= 4) ? Integer.parseInt(args[3]) : 20;
-			
-			String tsimCommand = String.format("/chalmers/groups/tda381/bin/tsim --speed=%d %s", tsim_speed, map);
+
+			boolean mac = "Mac OS X".equals(System.getProperty("os.name"));
+			String tsimCommand = String.format(mac ? "/usr/local/bin/tsim --speed=%d %s": "/chalmers/groups/tda381/bin/tsim --speed=%d %s", tsim_speed, map);
 			Process p = Runtime.getRuntime().exec(tsimCommand);
 			TSimInterface.init(p.getInputStream(), p.getOutputStream());
 			TSimInterface.getInstance().setDebug(true);

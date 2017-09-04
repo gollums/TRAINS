@@ -1,23 +1,24 @@
 import TSim.*;
 
 import java.util.concurrent.Semaphore;
+import static TSim.TSimInterface.SWITCH_RIGHT;
+import static TSim.TSimInterface.SWITCH_LEFT;
 
 public class Lab1 {
 
     private static final SensorPos[] SENSOR_POSITIONS = {
-            p(18, 7, new int[]{0, 1}, new int[]{3}), p(8, 6, new int[]{1}, new int[]{2}, new int[]{1}), p(9, 7, new int[]{2}, new int[]{0}, new int[]{0}),
-            p(16, 7, new int[]{0}, new int[]{3}),    p(8, 8, new int[]{2}, new int[]{1}, new int[]{1}), p(7, 7, new int[]{0}, new int[]{2}, new int[]{0}),
-            p(17, 3, new int[]{1}, new int[]{3}),    p(16, 9, new int[]{3}, new int[]{4, 5}),           p(15, 10, new int[]{3}, new int[]{5}),
-            p(3, 9, new int[]{4, 5}, new int[]{6}),  p(4, 10, new int[]{5}, new int[]{6}),              p(2, 11, new int[]{6}, new int[]{7, 8}),
-            p(3, 12, new int[]{6}, new int[]{8}),    p(4, 11, new int[]{6}, new int[]{7}),
+            p(18, 7, new int[]{0, 1}, new int[]{3}, new int[]{3}), p(8, 6, new int[]{1}, new int[]{2}, new int[]{1}), p(9, 7, new int[]{2}, new int[]{0}, new int[]{0}),
+            p(16, 7, new int[]{0}, new int[]{3}, new int[]{3}),    p(8, 8, new int[]{2}, new int[]{1}, new int[]{1}), p(7, 7, new int[]{0}, new int[]{2}, new int[]{0}),
+            p(17, 3, new int[]{1}, new int[]{3}),                  p(16, 9, new int[]{3}, new int[]{4, 5}),           p(15, 10, new int[]{3}, new int[]{5}),
+            p(3, 9,  new int[]{4, 5}, new int[]{6}),               p(4, 10, new int[]{5}, new int[]{6}),              p(2, 11, new int[]{6}, new int[]{7, 8}),
+            p(3, 12, new int[]{6}, new int[]{8}),                  p(4, 11, new int[]{6}, new int[]{7}),              p(17, 8, new int[]{1}, new int[]{3}, new int[]{3}),
             p(16, 3), p(16, 5), p(16, 11), p(16, 13)};
 
     private static final int NORTH = 0;
     private static final int SOUTH = 1;
 
     private Semaphore[] trackStatus;
-    private int[] trainPos;
-    
+
     /**
        TODO! : Explain constructor.
        @param speed1 Integer, 
@@ -27,25 +28,23 @@ public class Lab1 {
         trackStatus = new Semaphore[9];
         for (int i = 0; i < trackStatus.length; i++)
             trackStatus[i] = new Semaphore(1);
-        trainPos = new int[]{0, 9};
         new Thread(new Train(1, speed1, SOUTH, 0)).start();
         new Thread(new Train(2, speed2, NORTH, 7)).start();
     }
     
     /**
        
-       @param e SensorEvent
        @param x int
        @param y int
-       @param dx int
-       @param dy int
        @param dir int
        @throws CommandException,
      */
-    public void switchSensor(SensorEvent e, int x, int y, int dx, int dy, int dir) throws CommandException {
-      if (e.getXpos() == x && e.getYpos() == y && e.getStatus() == SensorEvent.ACTIVE) {
-          TSimInterface.getInstance().setSwitch(x + dx, y + dy, dir);
-      }
+    public static void switchSensor(int x, int y, int dir) throws CommandException {
+        TSimInterface.getInstance().setSwitch(x, y, dir);
+    }
+
+    public static boolean atSensor(SensorEvent e, int x, int y) {
+        return e.getXpos() == x && e.getYpos() == y && e.getStatus() == SensorEvent.ACTIVE;
     }
 
     private static SensorPos p(int x, int y, int[]... i) {
@@ -80,7 +79,6 @@ public class Lab1 {
               while(true) {
                   SensorEvent e = tsi.getSensor(id);
                   passSensor(e, id - 1);
-                  //switchSensor(e, 16, 7, 1, 0, TSimInterface.SWITCH_RIGHT);
               }
             }
             catch (CommandException e) {
@@ -92,7 +90,7 @@ public class Lab1 {
             }
         }
 
-        private void passSensor(SensorEvent e, int trainId) throws CommandException {
+        private void passSensor(SensorEvent e, int trainId) throws CommandException, InterruptedException {
             SensorPos p = getSensor(e);
             if (p != null) {
                 if (e.getStatus() == SensorEvent.ACTIVE) {
@@ -103,21 +101,30 @@ public class Lab1 {
                                 System.err.printf("Left: %d\tEntered: %d\n", ticket, sections[i]);
 
                                 if (tmpTicket == -1 && p.getSections().length == 3) {
-                                    tmpTicket = sections[i];
+                                    if (ticket == 3 && direction == NORTH) {
+                                        tmpTicket = ticket;
+                                        ticket = sections[i];
+                                    } else
+                                        tmpTicket = sections[i];
                                 } else {
                                     System.err.printf("Released ticket for %d\n", ticket);
                                     trackStatus[ticket].release();
                                     ticket = sections[i];
                                 }
 
+                                processSensorPass(e);
                                 break;
-                            } else if(ticket == sections[i] && p.getSections().length == 3 && tmpTicket != -1) {
+                            } else if (p.getSections().length == 3 && tmpTicket != -1) {
+                                processSensorPass(e);
                                 trackStatus[tmpTicket].release();
                                 System.err.printf("Left TMP: %d\tEntered: %d\n", tmpTicket, ticket);
                                 tmpTicket = -1;
-                            } else if (i+1 >= sections.length && ticket != sections[i]) {
-                                System.err.printf("Could not find an empty track");
+                            } else if (i+1 >= sections.length && ticket != sections[i] && tmpTicket != sections[i]) {
+                                System.err.println("Could not find an empty track");
                                 TSimInterface.getInstance().setSpeed(id, 0);
+                                trackStatus[sections[0]].acquire();
+                                ticket = sections[i];
+                                TSimInterface.getInstance().setSpeed(id, speed);
                             }
                         }
                     } else if (p.getSections().length == 0) {
@@ -126,6 +133,17 @@ public class Lab1 {
                     }
                 }
             }
+        }
+
+        private void processSensorPass(SensorEvent e) throws CommandException {
+            if (atSensor(e, 18, 7) && direction == NORTH && ticket == 1)
+                switchSensor(17, 7, SWITCH_LEFT);
+            else if (atSensor(e, 17, 8) && direction == NORTH)
+                switchSensor(17, 7, SWITCH_RIGHT);
+            //else if (atSensor(e, 16, 7) && direction == SOUTH)
+                //switchSensor(17, 7, SWITCH_RIGHT);
+
+
         }
         
         private SensorPos getSensor(SensorEvent e) {

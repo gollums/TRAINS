@@ -1,23 +1,30 @@
 import TSim.*;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import java.util.concurrent.Semaphore;
 
 public class Lab1 {
 
-    public static final SensorPos[] SENSOR_POSITIONS = { p(7, 7, 0), p(8, 6, 1), p(9, 7, 2), p(16, 7, 2), p(8, 8, 3),
-                                                         p(17, 8, 3), p(18, 7, 4), p(16, 9, 4), p(14, 9, 5), p(5, 9, 5),
-                                                         p(15, 10, 6), p(4, 7, 6), p(3, 9, 7), p(2, 11, 7), p(4, 11, 8), 
-                                                         p(3, 12, 9), p(16, 3, -1), p(16, 5, -1), p(16, 11, -1), p(16, 13, -1)};
-    private static final int TRACK_OCCUPIED = 0;
-    private static final int TRACK_UNOCCUPIED = 1;
-    private int[] trackStatus;
+    private static final SensorPos[] SENSOR_POSITIONS = {
+            p(18, 7, new int[]{0, 1}, new int[]{3}), p(8, 6, new int[]{1}, new int[]{2}, new int[]{1}), p(9, 7, new int[]{2}, new int[]{0}, new int[]{0}),
+            p(16, 7, new int[]{0}, new int[]{3}),    p(8, 8, new int[]{2}, new int[]{1}, new int[]{1}), p(7, 7, new int[]{0}, new int[]{2}, new int[]{0}),
+            p(17, 3, new int[]{1}, new int[]{3}),    p(16, 9, new int[]{3}, new int[]{4, 5}),           p(15, 10, new int[]{3}, new int[]{5}),
+            p(3, 9, new int[]{4, 5}, new int[]{6}),  p(4, 10, new int[]{5}, new int[]{6}),              p(2, 11, new int[]{6}, new int[]{7, 8}),
+            p(3, 12, new int[]{6}, new int[]{8}),    p(4, 11, new int[]{6}, new int[]{7}),
+            p(16, 3), p(16, 5), p(16, 11), p(16, 13)};
+
+    private static final int NORTH = 0;
+    private static final int SOUTH = 1;
+
+    private Semaphore[] trackStatus;
     private int[] trainPos;
     
     public Lab1(Integer speed1, Integer speed2) {
-        trackStatus = new int[10];
-        trainPos = new int[2];
-        new Thread(new Train(1, speed1)).start();
-        //new Thread(new Train(2, speed2)).start();
+        trackStatus = new Semaphore[9];
+        for (int i = 0; i < trackStatus.length; i++)
+            trackStatus[i] = new Semaphore(1);
+        trainPos = new int[]{0, 9};
+        new Thread(new Train(1, speed1, SOUTH)).start();
+        //new Thread(new Train(2, speed2, NORTH)).start();
     }
 
     public void switchSensor(SensorEvent e, int x, int y, int dx, int dy, int dir) throws CommandException {
@@ -26,18 +33,20 @@ public class Lab1 {
       }
     }
 
-    private static  SensorPos p(int x, int y, int s) {
-        return new SensorPos(x, y, s);
+    private static SensorPos p(int x, int y, int[]... i) {
+        return new SensorPos(x, y, i);
     }
     
     public class Train implements Runnable {
 
         private int id;
         private int speed;
+        private int direction;
         
-        public Train(int id, int speed) {
+        public Train(int id, int speed, int direction) {
             this.id = id;
             this.speed = speed;
+            this.direction = direction;
         }
         
         @Override
@@ -60,17 +69,17 @@ public class Lab1 {
               System.exit(1);
             }
         }
-        
+
         private void passSensor(SensorEvent e, int trainId) throws CommandException {
             SensorPos p = getSensor(e);
             if (p != null) {
                 if (e.getStatus() == SensorEvent.ACTIVE) {
-                    if (trainPos[trainId] != p.section && p.section != -1) {
-                        trackStatus[trainPos[trainId]] = TRACK_UNOCCUPIED;
-                        System.err.printf("Left: %d\tEntered: %d\n", trainPos[trainId], p.section);
-                        trackStatus[p.section] = TRACK_OCCUPIED;
-                        trainPos[trainId] = p.section;
-                    } else if (p.section == -1) {
+                    if (p.getSections().length != 0) {
+
+                        //trackStatus[trainPos[trainId]];
+                        //System.err.printf("Left: %d\tEntered: %d\n", trainPos[trainId], );
+                        //trainPos[trainId] = p.section;
+                    } else if (p.getSections().length == 0) {
                         System.err.printf("Train %d arrived at station\n", id);
                         TSimInterface.getInstance().setSpeed(id, 0);
                     }
@@ -92,12 +101,12 @@ public class Lab1 {
     public static class SensorPos {
         private int x;
         private int y;
-        private int section;
+        private int[][] sections;
         
-        public SensorPos(int x, int y, int section) {
+        public SensorPos(int x, int y, int[][] sections) {
             this.x = x;
             this.y = y;
-            this.section = section;
+            this.sections = sections;
         }
 
         public int getX() {
@@ -108,8 +117,8 @@ public class Lab1 {
             return y;
         }
 
-        public int getSection() {
-            return section;
+        public int[][] getSections() {
+            return sections;
         }
     }
   

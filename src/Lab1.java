@@ -18,6 +18,11 @@ public class Lab1 {
     private Semaphore[] trackStatus;
     private int[] trainPos;
     
+    /**
+       TODO! : Explain constructor.
+       @param speed1 Integer, 
+       @param speed2 Integer,
+     */
     public Lab1(Integer speed1, Integer speed2) {
         trackStatus = new Semaphore[9];
         for (int i = 0; i < trackStatus.length; i++)
@@ -26,7 +31,17 @@ public class Lab1 {
         new Thread(new Train(1, speed1, SOUTH)).start();
         //new Thread(new Train(2, speed2, NORTH)).start();
     }
-
+    
+    /**
+       
+       @param e SensorEvent
+       @param x int
+       @param y int
+       @param dx int
+       @param dy int
+       @param dir int
+       @throws CommandException,
+     */
     public void switchSensor(SensorEvent e, int x, int y, int dx, int dy, int dir) throws CommandException {
       if (e.getXpos() == x && e.getYpos() == y && e.getStatus() == SensorEvent.ACTIVE) {
           TSimInterface.getInstance().setSwitch(x + dx, y + dy, dir);
@@ -37,6 +52,9 @@ public class Lab1 {
         return new SensorPos(x, y, i);
     }
     
+    /**
+       
+     */
     public class Train implements Runnable {
 
         private int id;
@@ -98,6 +116,9 @@ public class Lab1 {
         
     }
     
+    /**
+       
+     */
     public static class SensorPos {
         private int x;
         private int y;

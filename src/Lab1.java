@@ -28,8 +28,8 @@ public class Lab1 {
         for (int i = 0; i < trackStatus.length; i++)
             trackStatus[i] = new Semaphore(1);
         trainPos = new int[]{0, 9};
-        new Thread(new Train(1, speed1, SOUTH)).start();
-        //new Thread(new Train(2, speed2, NORTH)).start();
+        new Thread(new Train(1, speed1, SOUTH, 0)).start();
+        new Thread(new Train(2, speed2, NORTH, 7)).start();
     }
     
     /**
@@ -60,11 +60,15 @@ public class Lab1 {
         private int id;
         private int speed;
         private int direction;
-        
-        public Train(int id, int speed, int direction) {
+        private int ticket;
+        private int tmpTicket = -1;
+
+        public Train(int id, int speed, int direction, int ticket) {
             this.id = id;
             this.speed = speed;
             this.direction = direction;
+            this.ticket = ticket;
+            trackStatus[ticket].tryAcquire();
         }
         
         @Override
@@ -76,7 +80,7 @@ public class Lab1 {
               while(true) {
                   SensorEvent e = tsi.getSensor(id);
                   passSensor(e, id - 1);
-                  switchSensor(e, 16, 7, 1, 0, TSimInterface.SWITCH_RIGHT);
+                  //switchSensor(e, 16, 7, 1, 0, TSimInterface.SWITCH_RIGHT);
               }
             }
             catch (CommandException e) {
@@ -93,10 +97,29 @@ public class Lab1 {
             if (p != null) {
                 if (e.getStatus() == SensorEvent.ACTIVE) {
                     if (p.getSections().length != 0) {
+                        int[] sections = p.getSections()[direction];
+                        for (int i = 0; i < sections.length; i++) {
+                            if (ticket != sections[i] && trackStatus[sections[i]].tryAcquire()) {
+                                System.err.printf("Left: %d\tEntered: %d\n", ticket, sections[i]);
 
-                        //trackStatus[trainPos[trainId]];
-                        //System.err.printf("Left: %d\tEntered: %d\n", trainPos[trainId], );
-                        //trainPos[trainId] = p.section;
+                                if (tmpTicket == -1 && p.getSections().length == 3) {
+                                    tmpTicket = sections[i];
+                                } else {
+                                    System.err.printf("Released ticket for %d\n", ticket);
+                                    trackStatus[ticket].release();
+                                    ticket = sections[i];
+                                }
+
+                                break;
+                            } else if(ticket == sections[i] && p.getSections().length == 3 && tmpTicket != -1) {
+                                trackStatus[tmpTicket].release();
+                                System.err.printf("Left TMP: %d\tEntered: %d\n", tmpTicket, ticket);
+                                tmpTicket = -1;
+                            } else if (i+1 >= sections.length && ticket != sections[i]) {
+                                System.err.printf("Could not find an empty track");
+                                TSimInterface.getInstance().setSpeed(id, 0);
+                            }
+                        }
                     } else if (p.getSections().length == 0) {
                         System.err.printf("Train %d arrived at station\n", id);
                         TSimInterface.getInstance().setSpeed(id, 0);

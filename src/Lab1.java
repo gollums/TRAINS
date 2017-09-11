@@ -10,7 +10,7 @@ public class Lab1 {
             p(6, 5, new int[]{0}, new int[]{2}, new int[]{0}),     p(10, 5, new int[]{1}, new int[]{2}, new int[]{1}),   p(13, 7, new int[]{2}, new int[]{3}, new int[]{0}),
             p(13, 8, new int[]{2}, new int[]{3}, new int[]{1}),    p(18, 7, new int[]{0,1}, new int[]{3}),               p(16, 9, new int[]{3}, new int[]{4,5}),
             p(9, 9, new int[]{3}, new int[]{6}),                   p(9, 10, new int[]{3}, new int[]{6}),                 p(3, 9, new int[]{4,5}, new int[]{6}),
-            p(1, 11, new int[]{6}, new int[]{7,8}),                p(8, 11,  new int[]{6}, new int[]{7}),                p(8, 13, new int[]{6}, new int[]{8}),
+            p(1, 11, new int[]{6}, new int[]{7,8}),                p(5, 11,  new int[]{6}, new int[]{7}),                p(5, 13, new int[]{6}, new int[]{8}),
             //Stations
             p(16, 3), p(16, 5), p(16, 11), p(16, 13)};
 
@@ -78,7 +78,7 @@ public class Lab1 {
               tsi.setSpeed(id, speed);
               while(true) { //TODO: while statement can't complete without throwing an exception?
                   SensorEvent e = tsi.getSensor(id);
-                  passSensor(e, id - 1);
+                  passSensor(e);
               }
             }
             catch (CommandException e) {
@@ -107,7 +107,7 @@ public class Lab1 {
             System.err.println("Train: " + this.id + "\tAcquired: " + id);
         }
 
-        private void passSensor(SensorEvent e, int trainId) throws CommandException, InterruptedException { // TODO: trainId is never used
+        private void passSensor(SensorEvent e) throws CommandException, InterruptedException {
             SensorPos p = getSensor(e);
             if (p != null) {
                 if (e.getStatus() == SensorEvent.ACTIVE) {
@@ -115,7 +115,7 @@ public class Lab1 {
                         boolean gotTrack = false;
                         int[] sections = p.getSections()[direction];
 
-                        if ((atSensor(e, 13, 7) || atSensor(e, 13, 8)) || (atSensor(e, 8, 11) || atSensor(e, 8, 13))) {
+                        if ((atSensor(e, 13, 7) || atSensor(e, 13, 8)) || (atSensor(e, 5, 11) || atSensor(e, 5, 13))) {
                             int sec = (atSensor(e, 13, 7) || atSensor(e, 13, 8)) ? 3: 6;
                             int dir = sec == 3 ? SOUTH: NORTH;
                             if (direction == dir) {
@@ -140,7 +140,6 @@ public class Lab1 {
                                     ticket = 4;
                                 else if (tryAcc(5))
                                     ticket = 5;
-                                release(oldTicket);
                                 gotTrack = true;
                                 processSensorPass(e);
                             } else {
@@ -164,6 +163,7 @@ public class Lab1 {
                             processSensorPass(e);
                         } else if (atSensor(e, 9, 9) || atSensor(e, 9, 10)) {
                             int sec = direction == NORTH ? 3: 6;
+                            release(sec == 3 ? 6: 3);
                             if (!tryAcc(sec)) {
                                 TSimInterface.getInstance().setSpeed(id, 0);
                                 acc(sec);
@@ -271,9 +271,9 @@ public class Lab1 {
                 switchSensor(3, 11, SWITCH_LEFT);
             else if (atSensor(e, 1, 11) && direction == SOUTH)
                 switchSensor(3, 11, SWITCH_RIGHT);
-            else if (atSensor(e, 8, 11) && direction == NORTH)
+            else if (atSensor(e, 5, 11) && direction == NORTH)
                 switchSensor(3, 11, SWITCH_LEFT);
-            else if (atSensor(e, 8, 13) && direction == NORTH)
+            else if (atSensor(e, 5, 13) && direction == NORTH)
                 switchSensor(3, 11, SWITCH_RIGHT);
         }
         

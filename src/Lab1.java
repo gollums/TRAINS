@@ -76,7 +76,7 @@ public class Lab1 {
 
             try {
               tsi.setSpeed(id, speed);
-              while(true) {
+              while(true) { //TODO: while statement can't complete without throwing an exception?
                   SensorEvent e = tsi.getSensor(id);
                   passSensor(e, id - 1);
               }
@@ -107,7 +107,7 @@ public class Lab1 {
             System.err.println("Train: " + this.id + "\tAcquired: " + id);
         }
 
-        private void passSensor(SensorEvent e, int trainId) throws CommandException, InterruptedException {
+        private void passSensor(SensorEvent e, int trainId) throws CommandException, InterruptedException { // TODO: trainId is never used
             SensorPos p = getSensor(e);
             if (p != null) {
                 if (e.getStatus() == SensorEvent.ACTIVE) {
@@ -229,7 +229,7 @@ public class Lab1 {
             if (ticket != sections[i] && trackStatus[sections[i]].tryAcquire()) {
                 System.err.printf("Train: %d\tLeft: %d\tEntered: %d\tstatus=%d\n", id, ticket, sections[i], trackStatus[sections[i]].availablePermits());
 
-                if (p.getSections().length == 3 && tmpTicket == -1) {
+                if (p.getSections().length == 3 && tmpTicket == -1) { //TODO: tmp ticket is always true?
                     System.err.printf("Train: %d\tEntered tmp track: %d\n", id, sections[i]);
                     tmpTicket = sections[i];
                 } else {

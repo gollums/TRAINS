@@ -10,7 +10,7 @@ public class Lab1 {
             p(6, 5, new int[]{0}, new int[]{2}, new int[]{0}),     p(10, 5, new int[]{1}, new int[]{2}, new int[]{1}),   p(13, 7, new int[]{2}, new int[]{3}, new int[]{0}),
             p(13, 8, new int[]{2}, new int[]{3}, new int[]{1}),    p(18, 7, new int[]{0,1}, new int[]{3}),               p(16, 9, new int[]{3}, new int[]{4,5}),
             p(9, 9, new int[]{3}, new int[]{6}),                   p(9, 10, new int[]{3}, new int[]{6}),                 p(3, 9, new int[]{4,5}, new int[]{6}),
-            p(2, 11, new int[]{6}, new int[]{7,8}),                p(8, 11,  new int[]{6}, new int[]{7}),                p(8, 13, new int[]{6}, new int[]{8}),
+            p(1, 11, new int[]{6}, new int[]{7,8}),                p(8, 11,  new int[]{6}, new int[]{7}),                p(8, 13, new int[]{6}, new int[]{8}),
             //Stations
             p(16, 3), p(16, 5), p(16, 11), p(16, 13)};
 
@@ -90,6 +90,23 @@ public class Lab1 {
             }
         }
 
+        public boolean tryAcc(int id) {
+            int old = trackStatus[id].availablePermits();
+            boolean r = trackStatus[id].tryAcquire();
+            System.err.println("Train: " + this.id + "\tTried: " + id + " = " + r + ":" + old + "->" + (trackStatus[id].availablePermits()));
+            return r;
+        }
+
+        public void release(int id) {
+            trackStatus[id].release();
+            System.err.println("Train: " + this.id + "\tReleased: " + id);
+        }
+
+        public void acc(int id) throws InterruptedException {
+            trackStatus[id].acquire();
+            System.err.println("Train: " + this.id + "\tAcquired: " + id);
+        }
+
         private void passSensor(SensorEvent e, int trainId) throws CommandException, InterruptedException {
             SensorPos p = getSensor(e);
             if (p != null) {
@@ -97,30 +114,89 @@ public class Lab1 {
                     if (p.getSections().length != 0) {
                         boolean gotTrack = false;
                         int[] sections = p.getSections()[direction];
-                        for (int i = 0; i < sections.length; i++) {
-                            if (tmpTicket == -1 && trySectionAcquire(sections, i, p, e)) {
+
+                        if ((atSensor(e, 13, 7) || atSensor(e, 13, 8)) || (atSensor(e, 8, 11) || atSensor(e, 8, 13))) {
+                            int sec = (atSensor(e, 13, 7) || atSensor(e, 13, 8)) ? 3: 6;
+                            int dir = sec == 3 ? SOUTH: NORTH;
+                            if (direction == dir) {
+                                if (sec == 3) trackStatus[2].release();
+                                if (!tryAcc(sec)) {
+                                    TSimInterface.getInstance().setSpeed(id, 0);
+                                    acc(sec);
+                                    TSimInterface.getInstance().setSpeed(id, speed);
+                                }
+                                release(ticket);
+                                ticket = sec;
+                            } else
+                                release(sec);
+                            tmpTicket = -1;
+                            gotTrack = true;
+                            processSensorPass(e);
+                        } else if (atSensor(e, 16, 9) || atSensor(e, 3, 9)) {
+                            int dir = atSensor(e, 16, 9) ? SOUTH: NORTH;
+                            if (direction == dir) {
+                                int oldTicket = ticket;
+                                if (tryAcc(4))
+                                    ticket = 4;
+                                else if (tryAcc(5))
+                                    ticket = 5;
+                                release(oldTicket);
                                 gotTrack = true;
                                 processSensorPass(e);
-                                break;
-                            } else if (tmpTicket != -1) {
-                                if (tmpTicket == 3) {
-                                    int tmp = tmpTicket;
-                                    tmpTicket = ticket;
-                                    ticket = tmp;
-                                }
-                                trackStatus[tmpTicket].release();
-                                System.err.printf("Train: %d\tLeft TMP: %d\tEntered: %d\n", id, tmpTicket, ticket);
-                                tmpTicket = -1;
+                            } else {
 
-                                if (trySectionAcquire(sections, i, p, e) || sections[i] == ticket) {
+                                if (ticket == (SOUTH == dir ? 3: 6)) {
+                                    gotTrack = true;
+                                }
+                            }
+                        } else if (atSensor(e, 18 ,7) || atSensor(e, 1, 11)){
+                            int sec = atSensor(e, 18, 7) ? 0: 7;
+                            int dir = sec == 0 ? NORTH: SOUTH;
+                            if (direction == dir) {
+                                if (tryAcc(sec)) {
+                                    ticket = sec;
+                                } else if (tryAcc(sec + 1)) {
+                                    ticket = sec + 1;
+                                }
+                            }
+                            tmpTicket = -1;
+                            gotTrack = true;
+                            processSensorPass(e);
+                        } else if (atSensor(e, 9, 9) || atSensor(e, 9, 10)) {
+                            int sec = direction == NORTH ? 3: 6;
+                            if (!tryAcc(sec)) {
+                                TSimInterface.getInstance().setSpeed(id, 0);
+                                acc(sec);
+                                TSimInterface.getInstance().setSpeed(id, speed);
+                            }
+                            release(ticket);
+                            ticket = sec;
+                            tmpTicket = -1;
+                            gotTrack = true;
+                            processSensorPass(e);
+                        }
+
+                        if (!gotTrack) {
+                            for (int i = 0; i < sections.length; i++) {
+                                if (tmpTicket == -1 && trySectionAcquire(sections, i, p, e)) {
                                     gotTrack = true;
                                     processSensorPass(e);
+                                    break;
+                                } else if (tmpTicket != -1) {
+                                    release(tmpTicket);
+                                    System.err.printf("Train: %d\tLeft TMP: %d\tEntered: %d\n", id, tmpTicket, ticket);
+                                    tmpTicket = -1;
+
+                                    if (trySectionAcquire(sections, i, p, e) || sections[i] == ticket) {
+                                        gotTrack = true;
+                                        processSensorPass(e);
+                                    }
+                                    break;
+                                } else if (sections[i] == ticket || sections[i] == tmpTicket) {
+                                    gotTrack = true;
+                                    processSensorPass(e);
+                                    break;
                                 }
-                                break;
-                            } else if (sections[i] == ticket || sections[i] == tmpTicket) {
-                                gotTrack = true;
-                                processSensorPass(e);
-                                break;
                             }
                         }
 
@@ -149,25 +225,17 @@ public class Lab1 {
         }
 
         private boolean trySectionAcquire(int[] sections, int i, SensorPos p, SensorEvent e) throws CommandException {
+            System.err.println("Trackstatus for ticket " + sections[i] + " is status=" + trackStatus[sections[i]].availablePermits());
             if (ticket != sections[i] && trackStatus[sections[i]].tryAcquire()) {
-                System.err.printf("Train: %d\tLeft: %d\tEntered: %d\n", id, ticket, sections[i]);
+                System.err.printf("Train: %d\tLeft: %d\tEntered: %d\tstatus=%d\n", id, ticket, sections[i], trackStatus[sections[i]].availablePermits());
 
-                if ((atSensor(e, 13,7) || atSensor(e, 13,8)) && ticket == 3 && direction == NORTH)
-                    trackStatus[ticket].release();
-
-                if (p.getSections().length == 3 && tmpTicket == -1 && tmpTicket != 3) {
+                if (p.getSections().length == 3 && tmpTicket == -1) {
                     System.err.printf("Train: %d\tEntered tmp track: %d\n", id, sections[i]);
                     tmpTicket = sections[i];
                 } else {
-                    if (atSensor(e, 18,7) && direction == NORTH) {
-                        System.err.printf("Train: %d\tChanged ticket for %d\n", id, ticket);
-                        tmpTicket = ticket;
-                        ticket = sections[i];
-                    } else {
-                        System.err.printf("Train: %d\tReleased ticket for %d\n", id, ticket);
-                        trackStatus[ticket].release();
-                        ticket = sections[i];
-                    }
+                    System.err.printf("Train: %d\tReleased ticket for %d\n", id, ticket);
+                    trackStatus[ticket].release();
+                    ticket = sections[i];
                 }
                 return true;
             }
@@ -199,9 +267,9 @@ public class Lab1 {
                 switchSensor(15, 9, SWITCH_LEFT);
             else if (atSensor(e, 9, 10) && direction == SOUTH)
                 switchSensor(4, 9, SWITCH_RIGHT);
-            else if (atSensor(e, 2, 11) && direction == SOUTH && ticket == 7)
+            else if (atSensor(e, 1, 11) && direction == SOUTH && ticket == 7)
                 switchSensor(3, 11, SWITCH_LEFT);
-            else if (atSensor(e, 2, 11) && direction == SOUTH)
+            else if (atSensor(e, 1, 11) && direction == SOUTH)
                 switchSensor(3, 11, SWITCH_RIGHT);
             else if (atSensor(e, 8, 11) && direction == NORTH)
                 switchSensor(3, 11, SWITCH_LEFT);

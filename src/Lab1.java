@@ -6,16 +6,12 @@ import static TSim.TSimInterface.SWITCH_LEFT;
 
 public class Lab1 {
 
-    private static final SensorPos[] SENSOR_POSITIONS = {
-            p(6, 5, new int[]{0}, new int[]{2}, new int[]{0}),     p(10, 5, new int[]{1}, new int[]{2}, new int[]{1}),   p(13, 7, new int[]{2}, new int[]{3}, new int[]{0}),
-            p(13, 8, new int[]{2}, new int[]{3}, new int[]{1}),    p(18, 7, new int[]{0,1}, new int[]{3}),               p(16, 9, new int[]{3}, new int[]{4,5}),
-            p(9, 9, new int[]{3}, new int[]{6}),                   p(9, 10, new int[]{3}, new int[]{6}),                 p(3, 9, new int[]{4,5}, new int[]{6}),
-            p(1, 11, new int[]{6}, new int[]{7,8}),                p(5, 11,  new int[]{6}, new int[]{7}),                p(5, 13, new int[]{6}, new int[]{8}),
-            //Stations
-            p(16, 3), p(16, 5), p(16, 11), p(16, 13)};
+    private static final SensorPos[] STATION_POSITIONS = {p(16, 3), p(16, 5), p(16, 11), p(16, 13)};
 
     private static final int NORTH = 0;
     private static final int SOUTH = 1;
+
+    private static final boolean DEBUG = true;
 
     private Semaphore[] trackStatus;
 
@@ -39,16 +35,16 @@ public class Lab1 {
        @param dir int
        @throws CommandException,
      */
-    public static void switchSensor(int x, int y, int dir) throws CommandException {
+    private static void switchSensor(int x, int y, int dir) throws CommandException {
         TSimInterface.getInstance().setSwitch(x, y, dir);
     }
 
-    public static boolean atSensor(SensorEvent e, int x, int y) {
-        return e.getXpos() == x && e.getYpos() == y && e.getStatus() == SensorEvent.ACTIVE;
+    private static boolean atSensor(SensorEvent e, int x, int y) {
+        return e.getXpos() == x && e.getYpos() == y;
     }
 
-    private static SensorPos p(int x, int y, int[]... i) {
-        return new SensorPos(x, y, i);
+    private static SensorPos p(int x, int y) {
+        return new SensorPos(x, y);
     }
     
     /**
@@ -60,7 +56,6 @@ public class Lab1 {
         private int speed;
         private int direction;
         private int ticket;
-        private int tmpTicket = -1;
 
         public Train(int id, int speed, int direction, int ticket) {
             this.id = id;
@@ -76,7 +71,7 @@ public class Lab1 {
 
             try {
               tsi.setSpeed(id, speed);
-              while(true) { //TODO: while statement can't complete without throwing an exception?
+              while(true) {
                   SensorEvent e = tsi.getSensor(id);
                   passSensor(e);
               }
@@ -90,156 +85,102 @@ public class Lab1 {
             }
         }
 
-        public boolean tryAcc(int id) {
+        private boolean tryAcc(int id) {
             int old = trackStatus[id].availablePermits();
             boolean r = trackStatus[id].tryAcquire();
-            System.err.println("Train: " + this.id + "\tTried: " + id + " = " + r + ":" + old + "->" + (trackStatus[id].availablePermits()));
+            if (DEBUG) System.err.printf("Train: %d\tTried: %d=%b:%d->%d\n", this.id, id, r, old, (trackStatus[id].availablePermits()));
             return r;
         }
 
-        public void release(int id) {
+        private void release(int id) {
             trackStatus[id].release();
-            System.err.println("Train: " + this.id + "\tReleased: " + id);
+            if (DEBUG) System.err.printf("Train: %d\tReleased: %d\n", this.id, id);
         }
 
-        public void acc(int id) throws InterruptedException {
+        private void acc(int id) throws InterruptedException {
             trackStatus[id].acquire();
-            System.err.println("Train: " + this.id + "\tAcquired: " + id);
+            if (DEBUG) System.err.printf("Train: %d\tAcquired: %d\n", this.id, id);
+        }
+
+        private void stopWait(int id) throws CommandException, InterruptedException {
+            if (DEBUG) System.err.printf("Train: %d\tWaiting for track %d\n", this.id, id);
+            TSimInterface.getInstance().setSpeed(this.id, 0);
+            acc(id);
+            TSimInterface.getInstance().setSpeed(this.id, speed);
+            if (DEBUG) System.err.printf("Train: %d\tGot track %d\n", this.id, id);
         }
 
         private void passSensor(SensorEvent e) throws CommandException, InterruptedException {
-            SensorPos p = getSensor(e);
-            if (p != null) {
-                if (e.getStatus() == SensorEvent.ACTIVE) {
-                    if (p.getSections().length != 0) {
-                        boolean gotTrack = false;
-                        int[] sections = p.getSections()[direction];
+            if (e.getStatus() == SensorEvent.ACTIVE) {
+                boolean station = isStation(e);
+                if (!station) {
+                    boolean atPart;
 
-                        if ((atSensor(e, 13, 7) || atSensor(e, 13, 8)) || (atSensor(e, 5, 11) || atSensor(e, 5, 13))) {
-                            int sec = (atSensor(e, 13, 7) || atSensor(e, 13, 8)) ? 3: 6;
-                            int dir = sec == 3 ? SOUTH: NORTH;
-                            if (direction == dir) {
-                                if (sec == 3) trackStatus[2].release();
-                                if (!tryAcc(sec)) {
-                                    TSimInterface.getInstance().setSpeed(id, 0);
-                                    acc(sec);
-                                    TSimInterface.getInstance().setSpeed(id, speed);
-                                }
-                                release(ticket);
-                                ticket = sec;
-                            } else
-                                release(sec);
-                            tmpTicket = -1;
-                            gotTrack = true;
-                            processSensorPass(e);
-                        } else if (atSensor(e, 16, 9) || atSensor(e, 3, 9)) {
-                            int dir = atSensor(e, 16, 9) ? SOUTH: NORTH;
-                            if (direction == dir) {
-                                int oldTicket = ticket; //TODO oldTicket never used
-                                if (tryAcc(4))
-                                    ticket = 4;
-                                else if (tryAcc(5))
-                                    ticket = 5;
-                                gotTrack = true;
-                                processSensorPass(e);
-                            } else {
-
-                                if (ticket == (SOUTH == dir ? 3: 6)) {
-                                    gotTrack = true;
-                                }
-                            }
-                        } else if (atSensor(e, 18 ,7) || atSensor(e, 1, 11)){
-                            int sec = atSensor(e, 18, 7) ? 0: 7;
-                            int dir = sec == 0 ? NORTH: SOUTH;
-                            if (direction == dir) {
-                                if (tryAcc(sec)) {
-                                    ticket = sec;
-                                } else if (tryAcc(sec + 1)) {
-                                    ticket = sec + 1;
-                                }
-                            }
-                            tmpTicket = -1;
-                            gotTrack = true;
-                            processSensorPass(e);
-                        } else if (atSensor(e, 9, 9) || atSensor(e, 9, 10)) {
-                            int sec = direction == NORTH ? 3: 6;
-                            release(sec == 3 ? 6: 3);
-                            if (!tryAcc(sec)) {
-                                TSimInterface.getInstance().setSpeed(id, 0);
-                                acc(sec);
-                                TSimInterface.getInstance().setSpeed(id, speed);
-                            }
+                    if ((atPart = (atSensor(e, 13, 7) || atSensor(e, 13, 8))) || (atSensor(e, 5, 11) || atSensor(e, 5, 13))) {
+                        int sec = atPart ? 3 : 6;
+                        int dir = sec == 3 ? SOUTH : NORTH;
+                        if (direction == dir) {
+                            if (atPart)
+                                release(2);
+                            if (!tryAcc(sec))
+                                stopWait(sec);
                             release(ticket);
                             ticket = sec;
-                            tmpTicket = -1;
-                            gotTrack = true;
+                        } else if (atPart && direction == NORTH) {
+                            release(3);
+                            if (!tryAcc(2))
+                                stopWait(2);
+                        } else
+                            release(sec);
+                        processSensorPass(e);
+                    } else if ((atSensor(e, 9, 5)) || atSensor(e, 6, 6)) {
+                        if (direction == SOUTH && !tryAcc(2))
+                            stopWait(2);
+                        else if (direction == NORTH)
+                            release(2);
+                    } else if ((atPart = atSensor(e, 16, 9)) || atSensor(e, 3, 9)) {
+                        int dir = atPart ? SOUTH: NORTH;
+                        if (direction == dir) {
+                            if (tryAcc(4))
+                                ticket = 4;
+                            else if (tryAcc(5))
+                                ticket = 5;
                             processSensorPass(e);
                         }
-
-                        if (!gotTrack) {
-                            for (int i = 0; i < sections.length; i++) {
-                                if (tmpTicket == -1 && trySectionAcquire(sections, i, p, e)) {
-                                    gotTrack = true;
-                                    processSensorPass(e);
-                                    break;
-                                } else if (tmpTicket != -1) {
-                                    release(tmpTicket);
-                                    System.err.printf("Train: %d\tLeft TMP: %d\tEntered: %d\n", id, tmpTicket, ticket);
-                                    tmpTicket = -1;
-
-                                    if (trySectionAcquire(sections, i, p, e) || sections[i] == ticket) {
-                                        gotTrack = true;
-                                        processSensorPass(e);
-                                    }
-                                    break;
-                                } else if (sections[i] == ticket || sections[i] == tmpTicket) {
-                                    gotTrack = true;
-                                    processSensorPass(e);
-                                    break;
-                                }
+                    } else if ((atPart = atSensor(e, 18 ,7)) || atSensor(e, 1, 11)){
+                        int sec = atPart ? 0: 7;
+                        int dir = sec == 0 ? NORTH: SOUTH;
+                        if (direction == dir) {
+                            if (tryAcc(sec)) {
+                                ticket = sec;
+                            } else if (tryAcc(sec + 1)) {
+                                ticket = sec + 1;
                             }
                         }
-
-                        if (!gotTrack) {
-                            System.err.printf("Train: %d\tCould not find an empty track\n", id);
-                            TSimInterface.getInstance().setSpeed(id, 0);
-                            trackStatus[sections[0]].acquire();
-                            trackStatus[ticket].release();
-                            ticket = sections[0];
-                            processSensorPass(e);
-                            TSimInterface.getInstance().setSpeed(id, speed);
+                        processSensorPass(e);
+                    } else if (atSensor(e, 9, 9) || atSensor(e, 9, 10)) {
+                        int sec = direction == NORTH ? 3: 6;
+                        release(sec == 3 ? 6: 3);
+                        if (!tryAcc(sec)) {
+                            stopWait(sec);
                         }
-                    } else if (p.getSections().length == 0) {
-                        System.err.printf("Train %d arrived at station\n", id);
-                        TSimInterface.getInstance().setSpeed(id, 0);
-                        Thread.sleep(1000 + (20 * Math.abs(speed)));
-                        if (direction == NORTH)
-                            direction = SOUTH;
-                        else
-                            direction = NORTH;
-                        speed = -speed;
-                        TSimInterface.getInstance().setSpeed(id, speed);
+                        release(ticket);
+                        ticket = sec;
+                        processSensorPass(e);
                     }
-                }
-            }
-        }
 
-        private boolean trySectionAcquire(int[] sections, int i, SensorPos p, SensorEvent e) throws CommandException {
-            System.err.println("Trackstatus for ticket " + sections[i] + " is status=" + trackStatus[sections[i]].availablePermits());
-            if (ticket != sections[i] && trackStatus[sections[i]].tryAcquire()) {
-                System.err.printf("Train: %d\tLeft: %d\tEntered: %d\tstatus=%d\n", id, ticket, sections[i], trackStatus[sections[i]].availablePermits());
-
-                if (p.getSections().length == 3 && tmpTicket == -1) {
-                    System.err.printf("Train: %d\tEntered tmp track: %d\n", id, sections[i]);
-                    tmpTicket = sections[i];
                 } else {
-                    System.err.printf("Train: %d\tReleased ticket for %d\n", id, ticket);
-                    trackStatus[ticket].release();
-                    ticket = sections[i];
+                    if (DEBUG) System.err.printf("Train %d arrived at station\n", id);
+                    TSimInterface.getInstance().setSpeed(id, 0);
+                    Thread.sleep(1000 + (20 * Math.abs(speed)));
+                    if (direction == NORTH)
+                        direction = SOUTH;
+                    else
+                        direction = NORTH;
+                    speed = -speed;
+                    TSimInterface.getInstance().setSpeed(id, speed);
                 }
-                return true;
             }
-            return false;
         }
 
         private void processSensorPass(SensorEvent e) throws CommandException {
@@ -277,13 +218,13 @@ public class Lab1 {
                 switchSensor(3, 11, SWITCH_RIGHT);
         }
         
-        private SensorPos getSensor(SensorEvent e) {
-            for (SensorPos p : SENSOR_POSITIONS) {
-                if (p.getX() == e.getXpos() && p.getY() == e.getYpos()) {
-                    return p;
+        private boolean isStation(SensorEvent e) {
+            for (SensorPos p : STATION_POSITIONS) {
+                if (atSensor(e, p.getX(), p.getY())) {
+                    return true;
                 }
             }
-            return null;
+            return false;
         }
         
     }
@@ -294,12 +235,10 @@ public class Lab1 {
     public static class SensorPos {
         private int x;
         private int y;
-        private int[][] sections;
-        
-        public SensorPos(int x, int y, int[][] sections) {
+
+        public SensorPos(int x, int y) {
             this.x = x;
             this.y = y;
-            this.sections = sections;
         }
 
         public int getX() {
@@ -310,9 +249,6 @@ public class Lab1 {
             return y;
         }
 
-        public int[][] getSections() {
-            return sections;
-        }
     }
   
 }

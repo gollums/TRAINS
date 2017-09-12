@@ -135,7 +135,7 @@ public class Lab1 {
                         } else if (atSensor(e, 16, 9) || atSensor(e, 3, 9)) {
                             int dir = atSensor(e, 16, 9) ? SOUTH: NORTH;
                             if (direction == dir) {
-                                int oldTicket = ticket;
+                                int oldTicket = ticket; //TODO oldTicket never used
                                 if (tryAcc(4))
                                     ticket = 4;
                                 else if (tryAcc(5))
@@ -229,7 +229,7 @@ public class Lab1 {
             if (ticket != sections[i] && trackStatus[sections[i]].tryAcquire()) {
                 System.err.printf("Train: %d\tLeft: %d\tEntered: %d\tstatus=%d\n", id, ticket, sections[i], trackStatus[sections[i]].availablePermits());
 
-                if (p.getSections().length == 3 && tmpTicket == -1) { //TODO: tmp ticket is always true?
+                if (p.getSections().length == 3 && tmpTicket == -1) {
                     System.err.printf("Train: %d\tEntered tmp track: %d\n", id, sections[i]);
                     tmpTicket = sections[i];
                 } else {

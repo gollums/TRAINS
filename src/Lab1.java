@@ -31,11 +31,11 @@ public class Lab1 {
      * @param speed2 Speed for the second train
      */
     public Lab1(Integer speed1, Integer speed2) {
-        trackStatus = new Semaphore[9];
+        trackStatus = new Semaphore[6];
         for (int i = 0; i < trackStatus.length; i++)
             trackStatus[i] = new Semaphore(1);
         new Thread(new Train(1, speed1, SOUTH, 0)).start();
-        new Thread(new Train(2, speed2, NORTH, 7)).start();
+        new Thread(new Train(2, speed2, NORTH, 5)).start();
     }
     
     /**
@@ -167,61 +167,66 @@ public class Lab1 {
                     // Handles leaving first and second into the third as well as leaving the seventh and eighth into the sixth
                     // Also traveling into the sections
                     if ((atPart = (atSensor(e, 13, 7) || atSensor(e, 13, 8))) || (atSensor(e, 5, 11) || atSensor(e, 5, 13))) {
-                        int sec = atPart ? 3 : 6;
-                        int dir = sec == 3 ? SOUTH : NORTH;
+                        int sec = atPart ? 2 : 4;
+                        int dir = sec == 2 ? SOUTH : NORTH;
                         if (direction == dir) {
                             if (atPart)
-                                release(2);
+                                release(1);
                             if (!tryAcc(sec))
                                 stopWait(sec);
-                            release(ticket);
+                            if (ticket != -1) release(ticket);
                             ticket = sec;
                         } else if (atPart && direction == NORTH) {
-                            release(3);
-                            if (!tryAcc(2))
-                                stopWait(2);
+                            release(2);
+                            if (!tryAcc(1))
+                                stopWait(1);
                         } else
                             release(sec);
                         processTrackSwitch(e);
 
                     // Handles the north entry and leaving of the + intersection
                     } else if ((atSensor(e, 9, 5)) || atSensor(e, 6, 6)) {
-                        if (direction == SOUTH && !tryAcc(2))
-                            stopWait(2);
+                        if (direction == SOUTH && !tryAcc(1))
+                            stopWait(1);
                         else if (direction == NORTH)
-                            release(2);
+                            release(1);
 
                     // Handles the entry of the fifth and fourth section
                     } else if ((atPart = atSensor(e, 16, 9)) || atSensor(e, 3, 9)) {
                         int dir = atPart ? SOUTH: NORTH;
                         if (direction == dir) {
-                            if (tryAcc(4))
-                                ticket = 4;
-                            else if (tryAcc(5))
-                                ticket = 5;
+                            if (tryAcc(3))
+                                ticket = 3;
+                            else
+                                ticket = -1;
                             processTrackSwitch(e);
                         }
 
                     // Handles the entry of the first, second, seventh and eighth
                     } else if ((atPart = atSensor(e, 18 ,7)) || atSensor(e, 1, 11)){
-                        int sec = atPart ? 0: 7;
+                        int sec = atPart ? 0: 5;
                         int dir = sec == 0 ? NORTH: SOUTH;
                         if (direction == dir) {
                             if (tryAcc(sec))
                                 ticket = sec;
-                            else if (tryAcc(sec + 1))
-                                ticket = sec + 1;
+                            else
+                                ticket = -1;
                         }
                         processTrackSwitch(e);
 
                     // Handles the passing of the middle double track
-                    } else if (atSensor(e, 9, 9) || atSensor(e, 9, 10)) {
-                        int sec = direction == NORTH ? 3: 6;
-                        release(sec == 3 ? 6: 3);
-                        if (!tryAcc(sec))
-                            stopWait(sec);
-                        release(ticket);
-                        ticket = sec;
+                    } else if ((atPart = (atSensor(e, 6, 9) || atSensor(e, 6, 10))) || atSensor(e, 13, 9) || atSensor(e, 13, 10)) {
+                        int sec = direction == NORTH ? 4 : 2;
+                        if ((atPart && direction == NORTH) || (!atPart && direction == SOUTH)) {
+                            release(sec);
+                        } else {
+                            sec = sec == 2 ? 4: 2;
+                            if (!tryAcc(sec))
+                                stopWait(sec);
+                            if (ticket == 3)
+                                release(3);
+                            ticket = sec;
+                        }
                         processTrackSwitch(e);
                     }
 
@@ -246,7 +251,7 @@ public class Lab1 {
          * @throws CommandException if the supplied id was false (NO_SUCH_TRAIN), if the speed was illegal (ILLEGAL_SPEED) or if the train had crashed.
          */
         private void processTrackSwitch(SensorEvent e) throws CommandException {
-            if (atSensor(e, 18, 7) && direction == NORTH && ticket == 1)
+            if (atSensor(e, 18, 7) && direction == NORTH && ticket == -1)
                 switchTrack(17, 7, SWITCH_LEFT);
             else if (atSensor(e, 18, 7) && direction == NORTH)
                 switchTrack(17, 7, SWITCH_RIGHT);
@@ -254,23 +259,23 @@ public class Lab1 {
                 switchTrack(17, 7, SWITCH_LEFT);
             else if (atSensor(e, 13, 7) && direction == SOUTH)
                 switchTrack(17, 7, SWITCH_RIGHT);
-            else if (atSensor(e, 16, 9) && direction == SOUTH && ticket == 4)
+            else if (atSensor(e, 16, 9) && direction == SOUTH && ticket == 3)
                 switchTrack(15, 9, SWITCH_RIGHT);
             else if (atSensor(e, 16, 9) && direction == SOUTH)
                 switchTrack(15, 9, SWITCH_LEFT);
-            else if (atSensor(e, 3, 9) && direction == NORTH && ticket == 4)
+            else if (atSensor(e, 3, 9) && direction == NORTH && ticket == 3)
                 switchTrack(4, 9, SWITCH_LEFT);
             else if (atSensor(e, 3, 9) && direction == NORTH)
                 switchTrack(4, 9, SWITCH_RIGHT);
-            else if (atSensor(e, 9, 9) && direction == NORTH)
+            else if (atSensor(e, 13, 9) && direction == NORTH)
                 switchTrack(15, 9, SWITCH_RIGHT);
-            else if (atSensor(e, 9, 9) && direction == SOUTH)
+            else if (atSensor(e, 6, 9) && direction == SOUTH)
                 switchTrack(4, 9, SWITCH_LEFT);
-            else if (atSensor(e, 9, 10) && direction == NORTH)
+            else if (atSensor(e, 13, 10) && direction == NORTH)
                 switchTrack(15, 9, SWITCH_LEFT);
-            else if (atSensor(e, 9, 10) && direction == SOUTH)
+            else if (atSensor(e, 6, 10) && direction == SOUTH)
                 switchTrack(4, 9, SWITCH_RIGHT);
-            else if (atSensor(e, 1, 11) && direction == SOUTH && ticket == 7)
+            else if (atSensor(e, 1, 11) && direction == SOUTH && ticket == 5)
                 switchTrack(3, 11, SWITCH_LEFT);
             else if (atSensor(e, 1, 11) && direction == SOUTH)
                 switchTrack(3, 11, SWITCH_RIGHT);

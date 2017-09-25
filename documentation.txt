@@ -1,4 +1,4 @@
-Our soulutioon is correct because the trains don't crash into eachother or derail. They don't wait for eachother for too long either.
+Our solution is correct because the trains don't crash into each other or derail. They don't wait for each other for too long either.
 Our solution uses 18 sensors and 6 semaphores.
 
 The train starts with a direction and a speed and when passing a sensor it is processed depending on the position the direction of the train.
@@ -6,8 +6,8 @@ It checks if it's a station and then stops if it's at one or releases tickets an
 When a new ticket was acquired the sensor position is processed for switching a track for that position and direction.
 
 The parts for checking what section of track the train is at, changing semaphores and switching tracks are essential parts of the code so the trains don't crash.
-Without checking what sensor that was triggered the program don't know where the train is and because of that can't make appropiate actions.
-Without the releasing and acquiring of track sections the trains would just go onto all track sections and eventuallt crash into eachother.
+Without checking what sensor that was triggered the program don't know where the train is and because of that can't make appropriate actions.
+Without the releasing and acquiring of track sections the trains would just go onto all track sections and eventually crash into each other.
 By switching the tracks after a section is acquired it makes sure that no one else will change it and that you don't change the track for the other train.
 
 The placement of sensors are done in the way that a train don't have to wait a very long time before the other one is clear of the track.
@@ -17,4 +17,4 @@ would crash if they don't wait for the section to be clear.
 
 The max speed that we have gotten is 19 and that's because with higher speeds the trains will go too far past sensors and either be in the way,
 pass the station sensor or crash into the stop.
-We tested our soulution on a couple of speed settings and made sure that the trains didn't crash into anything and was moving as fluid as possible.
+We tested our solution on a couple of speed settings and made sure that the trains didn't crash into anything and was moving as fluid as possible.
